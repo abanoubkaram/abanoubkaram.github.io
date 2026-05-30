@@ -1,7 +1,7 @@
 document.addEventListener("DOMContentLoaded", () => {
-    
+
     // ==========================================
-    // 🔥 إعدادات تشغيل السيرفر وقاعدة بيانات Firebase الخاصة بأبانوب
+    // إعدادات تفعيل السيرفر وقاعدة بيانات Firebase الخاصة بأبانوب
     // ==========================================
     const firebaseConfig = {
         apiKey: "AIzaSyCCiw64plS7KZLLjQCg7L4zo7bXY4568Rk",
@@ -18,131 +18,68 @@ document.addEventListener("DOMContentLoaded", () => {
     firebase.initializeApp(firebaseConfig);
     const database = firebase.database();
 
-
-    // 1. ⏳ إدارة شاشة التحميل الذكية (تختفي بعد 3 ثوانٍ)
+    // إدارة شاشة التحميل الذكية (تختفي بعد 3 ثوانٍ)
     const loader = document.getElementById("system-loader");
     if (loader) {
         setTimeout(() => {
             loader.style.opacity = "0";
-            loader.style.visibility = "hidden";
-            handleScrollReveal();
-        }, 3000); 
+            setTimeout(() => {
+                loader.style.display = "none";
+            }, 500);
+        }, 3000);
     }
 
-    // 2. 🎬 نظام تحريك وظهور المحتويات تدريجياً أثناء النزول (Scroll Reveal)
-    const revealElements = document.querySelectorAll(".reveal");
-
-    function handleScrollReveal() {
-        const triggerBottom = window.innerHeight * 0.85;
-
-        revealElements.forEach(element => {
-            const elementTop = element.getBoundingClientRect().top;
-            if (elementTop < triggerBottom) {
-                element.classList.add("active");
-            }
-        });
-    }
-
-    window.addEventListener("scroll", handleScrollReveal);
-
-
-    // 3. 🔥 نظام الإعجابات السحابي والتقييم المشترك الحي
+    // ==========================================
+    // نظام الإعجابات والتقييم الحي (Firebase Realtime)
+    // ==========================================
     const likeButton = document.getElementById("like-btn");
     const likeIcon = document.getElementById("like-icon");
     const likeText = document.getElementById("like-text");
     const likesDisplay = document.getElementById("likes-count");
     const ratingDisplay = document.getElementById("rating-score");
 
-    // التحقق من حالة الإعجاب محلياً بجهاز الزائر (لمنع السبام)
     let userHasLiked = localStorage.getItem("portfolio_user_liked") === "true";
 
+    // الاستماع للتغييرات في السيرفر وتحديث الشاشة فوراً
+    database.ref("likes_system").on("value", (snapshot) => {
+        const data = snapshot.val() || { totalLikes: 0, totalRating: 0.0 };
+        
+        if (likesDisplay) likesDisplay.innerText = data.totalLikes;
+        if (ratingDisplay) ratingDisplay.innerText = parseFloat(data.totalRating).toFixed(1);
+    });
+
+    // تحديث شكل الزرار للمستخدم لو كان ضغط لايك قبل كده
     if (userHasLiked && likeIcon && likeText) {
-        likeIcon.className = "fas fa-heart pulse-heart";
+        likeIcon.className = "fas fa-heart text-danger";
         likeText.innerText = "تم الإعجاب";
     }
 
-    // 📥 استماع حي دائم من السيرفر لعدد اللايكات وعرضها للجميع في نفس اللحظة
-    database.ref("likes_count").on("value", (snapshot) => {
-        let totalLikes = snapshot.val() || 0;
-        if (likesDisplay) likesDisplay.innerText = totalLikes;
-        
-        // حساب التقييم من 5 نجوم بناءً على مجموع اللايكات العامة
-        let calculatedRating = (totalLikes * 0.2);
-        if (calculatedRating > 5.0) calculatedRating = 5.0;
-        if (ratingDisplay) ratingDisplay.innerText = calculatedRating.toFixed(1);
-    });
-
-    // 🔴 عند الضغط على زر اللايك (يعدل على القيمة المشتركة بالسيرفر)
+    // عند الضغط على زرار الإعجاب
     if (likeButton) {
         likeButton.addEventListener("click", () => {
-            database.ref("likes_count").transaction((currentLikes) => {
-                currentLikes = currentLikes || 0;
-                if (!userHasLiked) {
+            if (userHasLiked) {
+                alert("لقد قمت بالإعجاب بالمعرض مسبقاً! شكراً لك لدعمك ✨");
+                return;
+            }
+
+            // جلب البيانات الحالية من السيرفر وزيادتها
+            database.ref("likes_system").transaction((currentData) => {
+                if (currentData === null) {
+                    return { totalLikes: 1, totalRating: 5.0 };
+                } else {
+                    let newLikes = currentData.totalLikes + 1;
+                    // حساب التقييم بشكل ديناميكي (كل ما اللايكات تزيد، التقييم يقرب من 5.0)
+                    let newRating = Math.min(5.0, 4.0 + (newLikes * 0.1)); 
+                    return { totalLikes: newLikes, totalRating: newRating };
+                }
+            }, (error, committed) => {
+                if (committed) {
                     userHasLiked = true;
                     localStorage.setItem("portfolio_user_liked", "true");
-                    likeIcon.className = "fas fa-heart pulse-heart";
-                    likeText.innerText = "تم الإعجاب";
-                    return currentLikes + 1;
-                } else {
-                    userHasLiked = false;
-                    localStorage.setItem("portfolio_user_liked", "false");
-                    likeIcon.className = "far fa-heart";
-                    likeIcon.classList.remove("pulse-heart");
-                    likeText.innerText = "إعجاب";
-                    return currentLikes - 1 > 0 ? currentLikes - 1 : 0;
+                    if (likeIcon) likeIcon.className = "fas fa-heart text-danger";
+                    if (likeText) likeText.innerText = "تم الإعجاب";
                 }
             });
-        });
-    }
-
-
-    // 4. 💬 إدارة صندوق التعليقات السحابية اللايف للزوار
-    const submissionForm = document.getElementById("submission-form");
-    const commentsVerticalStack = document.getElementById("comments-vertical-stack");
-
-    // 📥 استماع حي دائم للتعليقات: أي تعليق يتكتب يظهر فوراً عند كل اللي فاتحين الموقع
-    database.ref("comments").on("value", (snapshot) => {
-        if (commentsVerticalStack) {
-            commentsVerticalStack.innerHTML = ""; // تنظيف القائمة لعرض البيانات الحديثة والجديدة
-            const data = snapshot.val();
-            if (data) {
-                // عرض التعليقات من الأحدث إلى الأقدم
-                Object.keys(data).reverse().forEach(key => {
-                    const comment = data[key];
-                    const bubble = document.createElement("div");
-                    bubble.className = "comment-bubble glass";
-                    bubble.style.opacity = "1";
-                    bubble.style.transform = "translateY(0)";
-                    bubble.style.marginBottom = "15px";
-
-                    bubble.innerHTML = `
-                        <strong style="color: var(--neon-blue); display: block; margin-bottom: 6px; font-size: 15px;">
-                            <i class="fas fa-user-tag"></i> ${comment.name}
-                        </strong>
-                        <p style="color: var(--text-muted); font-size: 13px; line-height: 1.6;">${comment.message}</p>
-                    `;
-                    commentsVerticalStack.appendChild(bubble);
-                });
-            }
-        }
-    });
-
-    // 📤 دفع وإرسال تعليق جديد إلى السيرفر الرئيسي للـ Firebase
-    if (submissionForm) {
-        submissionForm.addEventListener("submit", (e) => {
-            e.preventDefault();
-
-            const inputName = document.getElementById("visitor-name").value;
-            const inputMessage = document.getElementById("visitor-message").value;
-
-            // إرسال البيانات للفايربيز
-            database.ref("comments").push({
-                name: inputName,
-                message: inputMessage,
-                timestamp: Date.now()
-            });
-
-            submissionForm.reset();
         });
     }
 });
