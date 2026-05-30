@@ -1,5 +1,24 @@
 document.addEventListener("DOMContentLoaded", () => {
     
+    // ==========================================
+    // 🔥 إعدادات تشغيل السيرفر وقاعدة بيانات Firebase الخاصة بأبانوب
+    // ==========================================
+    const firebaseConfig = {
+        apiKey: "AIzaSyCCiw64plS7KZLLjQCg7L4zo7bXY4568Rk",
+        authDomain: "abanoub-portfolio.firebaseapp.com",
+        databaseURL: "https://abanoub-portfolio-default-rtdb.firebaseio.com",
+        projectId: "abanoub-portfolio",
+        storageBucket: "abanoub-portfolio.firebasestorage.app",
+        messagingSenderId: "859350701200",
+        appId: "1:859350701200:web:1bfdb745229423d7b87415",
+        measurementId: "G-5EKWEXOXBE"
+    };
+
+    // بدء الاتصال بالسيرفر
+    firebase.initializeApp(firebaseConfig);
+    const database = firebase.database();
+
+
     // 1. ⏳ إدارة شاشة التحميل الذكية (تختفي بعد 3 ثوانٍ)
     const loader = document.getElementById("system-loader");
     if (loader) {
@@ -7,7 +26,7 @@ document.addEventListener("DOMContentLoaded", () => {
             loader.style.opacity = "0";
             loader.style.visibility = "hidden";
             handleScrollReveal();
-        }, 3000);
+        }, 3000); 
     }
 
     // 2. 🎬 نظام تحريك وظهور المحتويات تدريجياً أثناء النزول (Scroll Reveal)
@@ -15,6 +34,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     function handleScrollReveal() {
         const triggerBottom = window.innerHeight * 0.85;
+
         revealElements.forEach(element => {
             const elementTop = element.getBoundingClientRect().top;
             if (elementTop < triggerBottom) {
@@ -22,125 +42,105 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         });
     }
+
     window.addEventListener("scroll", handleScrollReveal);
 
 
-    // 3. 💾 نظام الإعجابات والتقييم الثابت (LocalStorage)
+    // 3. 🔥 نظام الإعجابات السحابي والتقييم المشترك الحي
     const likeButton = document.getElementById("like-btn");
     const likeIcon = document.getElementById("like-icon");
     const likeText = document.getElementById("like-text");
     const likesDisplay = document.getElementById("likes-count");
     const ratingDisplay = document.getElementById("rating-score");
-    
-    // استعادة البيانات المحفوظة أو بدء قيم جديدة
-    let currentLikes = parseInt(localStorage.getItem("portfolio_likes")) || 0;
-    let currentRating = parseFloat(localStorage.getItem("portfolio_rating")) || 0.0;
+
+    // التحقق من حالة الإعجاب محلياً بجهاز الزائر (لمنع السبام)
     let userHasLiked = localStorage.getItem("portfolio_user_liked") === "true";
 
-    // عرض البيانات المحفوظة فور تحميل الصفحة
-    if (likesDisplay) likesDisplay.innerText = currentLikes;
-    if (ratingDisplay) ratingDisplay.innerText = currentRating.toFixed(1);
-    
     if (userHasLiked && likeIcon && likeText) {
-        likeIcon.className = "fas fa-heart text-danger";
+        likeIcon.className = "fas fa-heart pulse-heart";
         likeText.innerText = "تم الإعجاب";
     }
 
-    if (likeButton && likesDisplay && ratingDisplay) {
+    // 📥 استماع حي دائم من السيرفر لعدد اللايكات وعرضها للجميع في نفس اللحظة
+    database.ref("likes_count").on("value", (snapshot) => {
+        let totalLikes = snapshot.val() || 0;
+        if (likesDisplay) likesDisplay.innerText = totalLikes;
+        
+        // حساب التقييم من 5 نجوم بناءً على مجموع اللايكات العامة
+        let calculatedRating = (totalLikes * 0.2);
+        if (calculatedRating > 5.0) calculatedRating = 5.0;
+        if (ratingDisplay) ratingDisplay.innerText = calculatedRating.toFixed(1);
+    });
+
+    // 🔴 عند الضغط على زر اللايك (يعدل على القيمة المشتركة بالسيرفر)
+    if (likeButton) {
         likeButton.addEventListener("click", () => {
-            if (!userHasLiked) {
-                currentLikes++;
-                currentRating = (currentLikes * 0.2);
-                if (currentRating > 5.0) currentRating = 5.0;
-
-                likeIcon.className = "fas fa-heart pulse-heart";
-                likeText.innerText = "تم الإعجاب";
-                userHasLiked = true;
-            } else {
-                currentLikes--;
-                currentRating = (currentLikes * 0.2);
-                if (currentRating < 0.0) currentRating = 0.0;
-
-                likeIcon.className = "far fa-heart";
-                likeIcon.classList.remove("pulse-heart");
-                likeText.innerText = "إعجاب";
-                userHasLiked = false;
-            }
-
-            // تحديث الشاشة
-            likesDisplay.innerText = currentLikes;
-            ratingDisplay.innerText = currentRating.toFixed(1);
-
-            // حفظ التعديلات في المتصفح بشكل دائم
-            localStorage.setItem("portfolio_likes", currentLikes);
-            localStorage.setItem("portfolio_rating", currentRating);
-            localStorage.setItem("portfolio_user_liked", userHasLiked);
+            database.ref("likes_count").transaction((currentLikes) => {
+                currentLikes = currentLikes || 0;
+                if (!userHasLiked) {
+                    userHasLiked = true;
+                    localStorage.setItem("portfolio_user_liked", "true");
+                    likeIcon.className = "fas fa-heart pulse-heart";
+                    likeText.innerText = "تم الإعجاب";
+                    return currentLikes + 1;
+                } else {
+                    userHasLiked = false;
+                    localStorage.setItem("portfolio_user_liked", "false");
+                    likeIcon.className = "far fa-heart";
+                    likeIcon.classList.remove("pulse-heart");
+                    likeText.innerText = "إعجاب";
+                    return currentLikes - 1 > 0 ? currentLikes - 1 : 0;
+                }
+            });
         });
     }
 
 
-    // 4. 💬 إدارة وحفظ صندوق التعليقات المتتالية
+    // 4. 💬 إدارة صندوق التعليقات السحابية اللايف للزوار
     const submissionForm = document.getElementById("submission-form");
     const commentsVerticalStack = document.getElementById("comments-vertical-stack");
 
-    // دالة مخصصة لإنشاء شكل كارت التعليق على الشاشة
-    function createCommentBubble(name, message) {
-        const bubble = document.createElement("div");
-        bubble.className = "comment-bubble glass";
-        bubble.innerHTML = `
-            <strong style="color: var(--neon-blue); display: block; margin-bottom: 6px; font-size: 15px;">
-                <i class="fas fa-user-tag"></i> ${name}
-            </strong>
-            <p style="color: var(--text-muted); font-size: 13px; line-height: 1.6;">${message}</p>
-        `;
-        return bubble;
-    }
+    // 📥 استماع حي دائم للتعليقات: أي تعليق يتكتب يظهر فوراً عند كل اللي فاتحين الموقع
+    database.ref("comments").on("value", (snapshot) => {
+        if (commentsVerticalStack) {
+            commentsVerticalStack.innerHTML = ""; // تنظيف القائمة لعرض البيانات الحديثة والجديدة
+            const data = snapshot.val();
+            if (data) {
+                // عرض التعليقات من الأحدث إلى الأقدم
+                Object.keys(data).reverse().forEach(key => {
+                    const comment = data[key];
+                    const bubble = document.createElement("div");
+                    bubble.className = "comment-bubble glass";
+                    bubble.style.opacity = "1";
+                    bubble.style.transform = "translateY(0)";
+                    bubble.style.marginBottom = "15px";
 
-    // استعادة التعليقات القديمة المحفوظة وعرضها
-    let savedComments = JSON.parse(localStorage.getItem("portfolio_comments")) || [];
-    if (commentsVerticalStack) {
-        savedComments.forEach(comment => {
-            const oldBubble = createCommentBubble(comment.name, comment.message);
-            commentsVerticalStack.appendChild(oldBubble); // إضافة التعليقات السابقة بالترتيب
-        });
-    }
+                    bubble.innerHTML = `
+                        <strong style="color: var(--neon-blue); display: block; margin-bottom: 6px; font-size: 15px;">
+                            <i class="fas fa-user-tag"></i> ${comment.name}
+                        </strong>
+                        <p style="color: var(--text-muted); font-size: 13px; line-height: 1.6;">${comment.message}</p>
+                    `;
+                    commentsVerticalStack.appendChild(bubble);
+                });
+            }
+        }
+    });
 
-    if (submissionForm && commentsVerticalStack) {
+    // 📤 دفع وإرسال تعليق جديد إلى السيرفر الرئيسي للـ Firebase
+    if (submissionForm) {
         submissionForm.addEventListener("submit", (e) => {
             e.preventDefault();
 
             const inputName = document.getElementById("visitor-name").value;
             const inputMessage = document.getElementById("visitor-message").value;
 
-            // إنشاء التعليق الجديد وضخه في أول القائمة بحركة سلسة
-            const newBubble = createCommentBubble(inputName, inputMessage);
-            newBubble.style.opacity = "0";
-            newBubble.style.transform = "translateY(12px)";
-            newBubble.style.transition = "all 0.4s ease";
-
-            commentsVerticalStack.insertBefore(newBubble, commentsVerticalStack.firstChild);
-
-            setTimeout(() => {
-                newBubble.style.opacity = "1";
-                newBubble.style.transform = "translateY(0)";
-            }, 50);
-
-            // إضافة التعليق الجديد للمصفوفة وحفظها في الـ LocalStorage
-            savedComments.unshift({ name: inputName, message: inputMessage });
-            localStorage.setItem("portfolio_comments", JSON.stringify(savedComments));
-
-            // زيادة العدادات تلقائياً مع التعليق الجديد إذا لم يكن قد ضغط إعجاب من قبل
-            if (!userHasLiked) {
-                currentLikes++;
-                currentRating = (currentLikes * 0.2);
-                if (currentRating > 5.0) currentRating = 5.0;
-                
-                if (likesDisplay) likesDisplay.innerText = currentLikes;
-                if (ratingDisplay) ratingDisplay.innerText = currentRating.toFixed(1);
-
-                localStorage.setItem("portfolio_likes", currentLikes);
-                localStorage.setItem("portfolio_rating", currentRating);
-            }
+            // إرسال البيانات للفايربيز
+            database.ref("comments").push({
+                name: inputName,
+                message: inputMessage,
+                timestamp: Date.now()
+            });
 
             submissionForm.reset();
         });
