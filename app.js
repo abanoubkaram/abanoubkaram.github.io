@@ -1,7 +1,7 @@
 document.addEventListener("DOMContentLoaded", () => {
 
     // ==========================================
-    // 1. إعدادات تفعيل السيرفر وقاعدة بيانات Firebase الخاصة بأبانوب
+    // 1. إعدادات تفعيل السيرفر وقاعدة بيانات Firebase
     // ==========================================
     const firebaseConfig = {
         apiKey: "AIzaSyCCiw64plS7KZLLjQCg7L4zo7bXY4568Rk",
@@ -19,16 +19,29 @@ document.addEventListener("DOMContentLoaded", () => {
     const database = firebase.database();
 
     // ==========================================
-    // 2. حل مشكلة الشاشة السوداء (إخفاء الـ Loader فوراً)
+    // 2. فك سحر الاختفاء وإظهار المحتوى فوراً 🚀
     // ==========================================
+    // إجبار البودي والصفحة على فتح السكرول والظهور
+    document.body.style.setProperty("overflow", "auto", "important");
+    document.documentElement.style.setProperty("overflow", "auto", "important");
+    document.body.style.setProperty("visibility", "visible", "important");
+    document.body.style.setProperty("opacity", "1", "important");
+
+    // السطور السحرية: جلب كل الـ sections والكلاسات المخفية وإجبارها على الظهور بنسبة 100%
+    const allSections = document.querySelectorAll("section, main, .hero-section-reveal, div");
+    allSections.forEach(section => {
+        // لو القسم شفاف أو مخفي، بنرجعه يظهر فوراً ويلغي تأثير الـ Scroll Reveal القديم
+        if (window.getComputedStyle(section).opacity === "0" || section.classList.contains("hero-section-reveal")) {
+            section.style.setProperty("opacity", "1", "important");
+            section.style.setProperty("visibility", "visible", "important");
+            section.style.setProperty("transform", "none", "important");
+        }
+    });
+
+    // إخفاء الـ Loader القديم تماماً
     const loader = document.getElementById("system-loader");
     if (loader) {
-        // بنخفيه تدريجياً عشان الموقع يظهر بسلاسة
-        loader.style.transition = "opacity 0.5s ease";
-        loader.style.opacity = "0";
-        setTimeout(() => {
-            loader.style.display = "none";
-        }, 500);
+        loader.style.display = "none";
     }
 
     // ==========================================
@@ -45,7 +58,6 @@ document.addEventListener("DOMContentLoaded", () => {
     // الاستماع للتغييرات في السيرفر وتحديث الشاشة فوراً
     database.ref("likes_system").on("value", (snapshot) => {
         const data = snapshot.val() || { totalLikes: 0, totalRating: 0.0 };
-        
         if (likesDisplay) likesDisplay.innerText = data.totalLikes;
         if (ratingDisplay) ratingDisplay.innerText = parseFloat(data.totalRating).toFixed(1);
     });
@@ -64,7 +76,6 @@ document.addEventListener("DOMContentLoaded", () => {
                 return;
             }
 
-            // جلب البيانات الحالية من السيرفر وزيادتها
             database.ref("likes_system").transaction((currentData) => {
                 if (currentData === null) {
                     return { totalLikes: 1, totalRating: 5.0 };
