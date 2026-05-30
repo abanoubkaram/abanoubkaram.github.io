@@ -1,7 +1,7 @@
 document.addEventListener("DOMContentLoaded", () => {
 
     // ==========================================
-    // إعدادات تفعيل السيرفر وقاعدة بيانات Firebase الخاصة بأبانوب
+    // 1. إعدادات تفعيل السيرفر وقاعدة بيانات Firebase الخاصة بأبانوب
     // ==========================================
     const firebaseConfig = {
         apiKey: "AIzaSyCCiw64plS7KZLLjQCg7L4zo7bXY4568Rk",
@@ -18,19 +18,21 @@ document.addEventListener("DOMContentLoaded", () => {
     firebase.initializeApp(firebaseConfig);
     const database = firebase.database();
 
-    // إدارة شاشة التحميل الذكية (تختفي بعد 3 ثوانٍ)
+    // ==========================================
+    // 2. حل مشكلة الشاشة السوداء (إخفاء الـ Loader فوراً)
+    // ==========================================
     const loader = document.getElementById("system-loader");
     if (loader) {
+        // بنخفيه تدريجياً عشان الموقع يظهر بسلاسة
+        loader.style.transition = "opacity 0.5s ease";
+        loader.style.opacity = "0";
         setTimeout(() => {
-            loader.style.opacity = "0";
-            setTimeout(() => {
-                loader.style.display = "none";
-            }, 500);
-        }, 3000);
+            loader.style.display = "none";
+        }, 500);
     }
 
     // ==========================================
-    // نظام الإعجابات والتقييم الحي (Firebase Realtime)
+    // 3. نظام الإعجابات والتقييم الحي (Firebase Realtime)
     // ==========================================
     const likeButton = document.getElementById("like-btn");
     const likeIcon = document.getElementById("like-icon");
@@ -68,7 +70,6 @@ document.addEventListener("DOMContentLoaded", () => {
                     return { totalLikes: 1, totalRating: 5.0 };
                 } else {
                     let newLikes = currentData.totalLikes + 1;
-                    // حساب التقييم بشكل ديناميكي (كل ما اللايكات تزيد، التقييم يقرب من 5.0)
                     let newRating = Math.min(5.0, 4.0 + (newLikes * 0.1)); 
                     return { totalLikes: newLikes, totalRating: newRating };
                 }
