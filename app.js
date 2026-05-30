@@ -81,7 +81,7 @@ document.addEventListener("DOMContentLoaded", () => {
                     return { totalLikes: 1, totalRating: 5.0 };
                 } else {
                     let newLikes = currentData.totalLikes + 1;
-                    let newRating = Math.min(5.0, 4.0 + (newLikes * 0.1)); 
+                    let newRating = Math.min(5.0, 4.0 + (newLikes * 0.1));
                     return { totalLikes: newLikes, totalRating: newRating };
                 }
             }, (error, committed) => {
@@ -92,6 +92,62 @@ document.addEventListener("DOMContentLoaded", () => {
                     if (likeText) likeText.innerText = "تم الإعجاب";
                 }
             });
+        });
+    }
+    // =====================
+    // نظام التعليقات
+    // =====================
+
+    const form = document.getElementById("submission-form");
+    const commentsContainer = document.getElementById("comments-vertical-stack");
+
+    if (form && commentsContainer) {
+
+        database.ref("comments").on("value", (snapshot) => {
+
+            commentsContainer.innerHTML = "";
+
+            const comments = snapshot.val();
+
+            if (!comments) {
+                commentsContainer.innerHTML =
+                    "<p>لا توجد تعليقات حتى الآن.</p>";
+                return;
+            }
+
+            Object.values(comments).reverse().forEach(comment => {
+
+                const commentBox = document.createElement("div");
+
+                commentBox.className = "glass";
+                commentBox.style.padding = "15px";
+                commentBox.style.marginBottom = "15px";
+
+                commentBox.innerHTML = `
+                <h4>${comment.name}</h4>
+                <p>${comment.message}</p>
+            `;
+
+                commentsContainer.appendChild(commentBox);
+            });
+        });
+
+        form.addEventListener("submit", (e) => {
+
+            e.preventDefault();
+
+            const name = document.getElementById("visitor-name").value.trim();
+            const message = document.getElementById("visitor-message").value.trim();
+
+            if (!name || !message) return;
+
+            database.ref("comments").push({
+                name: name,
+                message: message,
+                timestamp: Date.now()
+            });
+
+            form.reset();
         });
     }
 });
